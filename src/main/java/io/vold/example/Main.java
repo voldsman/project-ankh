@@ -17,6 +17,13 @@ public class Main {
 
         var router = server.getRouter();
 
+        router.get("/welcome", ctx -> {
+            var header = ctx.getRequestHeader("Custom");
+            System.out.println("Custom header: " + header);
+            ctx.setResponseHeader("From-BE", "Some-Value");
+            ctx.json(Map.of());
+        });
+
         router.get("/hello", ctx -> {
             System.out.println(ctx.getQueryParams());
             System.out.println(ctx.getQueryParams().get("myName"));
@@ -50,6 +57,19 @@ public class Main {
             ctx.json(user);
         });
 
+        router.get("/user/:userId/:profileId", ctx -> {
+            var userId = ctx.getPathParam("userId");
+            var profileId = ctx.getPathParam("profileId");
+            var user = new User(userId + "-byUserId, profileId-" + profileId);
+            ctx.json(user);
+        });
+
+        router.get("/user/:userId/profile", ctx -> {
+            var userId = ctx.getPathParam("userId");
+            var user = new User(userId + "-byUserId, profile");
+            ctx.json(user);
+        });
+
         router.get("/user/profile", ctx -> {
             ctx.result("Profile endpoint");
         });
@@ -58,16 +78,12 @@ public class Main {
             throw new UnauthorizedException("Unauthorized");
         });
 
-        router.get("custom", ctx -> {
+        router.get("/custom", ctx -> {
             throw new CustomException("Custom exception");
         });
 
-        router.exception(UnauthorizedException.class, (e, ctx) -> {
-            ctx.status(401);
-        });
-
         router.exception(CustomException.class, (e, ctx) -> {
-            ctx.status(500);
+            ctx.status(500).json(e.getMessage());
         });
 
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {

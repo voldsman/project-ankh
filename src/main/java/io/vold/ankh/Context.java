@@ -11,6 +11,7 @@ import java.io.InputStreamReader;
 import java.util.HashMap;
 import java.util.Map;
 
+import static java.lang.String.join;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Objects.nonNull;
 
@@ -26,6 +27,7 @@ public class Context {
     private int statusCode = 200;
     private String responseBody = "";
     private String contentType = CONTENT_TYPE_VALUE_TEXT_PLAIN;
+    private final Map<String, String> responseHeaders;
 
     private Map<String, String> pathParams;
 
@@ -34,6 +36,7 @@ public class Context {
         this.config = config;
 
         this.pathParams = new HashMap<>();
+        this.responseHeaders = new HashMap<>();
     }
 
     public String getPath() {
@@ -92,24 +95,40 @@ public class Context {
         return this;
     }
 
-    protected void complete() throws IOException {
-        var responseBytes = responseBody.getBytes(UTF_8);
-        exchange.getResponseHeaders().set(CONTENT_TYPE_HEADER, contentType);
-        exchange.sendResponseHeaders(statusCode, responseBytes.length);
-        try (var os = exchange.getResponseBody()) {
-            os.write(responseBytes);
-        }
-    }
-
     public void setPathParams(Map<String, String> pathParams) {
         this.pathParams = pathParams;
     }
 
-    public Map<String, String> getPathParams() {
-        return pathParams;
+    public String getPathParam(String paramName) {
+        return pathParams.getOrDefault(paramName, null);
     }
 
-    public String getPathParam(String paramName) {
-        return pathParams.get(paramName);
+    public Context setResponseHeader(String name, String value) {
+        responseHeaders.put(name, value);
+        return this;
+    }
+
+    public Map<String, String> getRequestHeaders() {
+        var headers = new HashMap<String, String>();
+        exchange.getRequestHeaders()
+                .forEach((key, value) -> headers.put(key, join(",", value)));
+        return headers;
+    }
+
+    public String getRequestHeader(String headerName) {
+        return getRequestHeaders().getOrDefault(headerName, null);
+    }
+
+    void complete() throws IOException {
+        var responseBytes = responseBody.getBytes(UTF_8);
+        exchange.getResponseHeaders().set(CONTENT_TYPE_HEADER, contentType);
+
+        // apply custom headers
+        responseHeaders.forEach((key, value) -> exchange.getResponseHeaders().set(key, value));
+
+        exchange.sendResponseHeaders(statusCode, responseBytes.length);
+        try (var os = exchange.getResponseBody()) {
+            os.write(responseBytes);
+        }
     }
 }
